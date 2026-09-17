@@ -42,9 +42,28 @@ jobs:
 
           # Uma etapa é uma linha de checkbox que ainda não aponta para uma issue.
           etapa = re.compile(r"^(\s*)- \[([ xX])\] +(?!#\d+\s*$)(.+?)\s*$")
+          cabecalho = re.compile(r"^#{1,6}\s+(.+?)\s*$")
+
+          # Nem toda linha de checkbox é tarefa. O bloco "Antes de fechar" do template
+          # de checklist é um portão sobre o checklist inteiro — "CI verde", "README
+          # reflete o que mudou" — e o GitHub renderiza esse bloco com a mesma sintaxe
+          # de uma etapa. Sem olhar o cabeçalho acima, não há como distinguir.
+          #
+          # Virar issue quebra o portão: o pai passa a depender de fechar uma issue
+          # chamada "CI verde", que não é trabalho que alguém faça e fecha. Aconteceu
+          # de verdade no identidade-visual em 2026-09-17: 7 sub-issues onde deviam
+          # ser 4.
+          PORTOES = ("antes de fechar",)
 
           linhas, criadas = corpo.splitlines(), []
+          desdobrando = True
           for i, linha in enumerate(linhas):
+              titulo = cabecalho.match(linha)
+              if titulo:
+                  desdobrando = titulo.group(1).strip().lower() not in PORTOES
+                  continue
+              if not desdobrando:
+                  continue
               m = etapa.match(linha)
               if not m:
                   continue
