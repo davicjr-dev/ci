@@ -1,0 +1,74 @@
+# Desdobra as etapas de uma issue de checklist em sub-issues, uma por etapa.
+#
+# A issue de checklist vira a mãe e cada etapa vira uma filha. O GitHub cuida do resto:
+# fechar uma filha move o progresso da mãe sozinho, e o campo `Sub-issues progress` do
+# Project acompanha sem ninguém atualizar nada.
+#
+# Depois de criar, a linha da etapa é reescrita como referência à issue criada. Isso torna
+# a operação idempotente — reeditar a mãe não duplica nada — e deixa acrescentar etapa
+# depois: basta escrever mais uma linha `- [ ] texto` e salvar.
+name: tarefas
+
+on:
+  workflow_call:
+
+jobs:
+  desdobrar:
+    if: contains(github.event.issue.labels.*.name, 'checklist')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: etapas viram sub-issues
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NUMERO: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re, subprocess, sys
+
+          REPO, NUMERO = os.environ["REPO"], os.environ["NUMERO"]
+
+          def gh(*args, entrada=None):
+              r = subprocess.run(["gh", *args], capture_output=True, text=True,
+                                 input=entrada, check=False)
+              if r.returncode != 0:
+                  print(f"::error::gh {' '.join(args)}: {r.stderr.strip()}")
+                  sys.exit(1)
+              return r.stdout
+
+          corpo = json.loads(gh("api", f"repos/{REPO}/issues/{NUMERO}"))["body"] or ""
+
+          # Uma etapa é uma linha de checkbox que ainda não aponta para uma issue.
+          etapa = re.compile(r"^(\s*)- \[([ xX])\] +(?!#\d+\s*$)(.+?)\s*$")
+
+          linhas, criadas = corpo.splitlines(), []
+          for i, linha in enumerate(linhas):
+              m = etapa.match(linha)
+              if not m:
+                  continue
+              recuo, marca, texto = m.groups()
+              if not texto.strip():
+                  continue
+
+              url = gh("issue", "create", "--repo", REPO, "--title", texto.strip(),
+                       "--body", f"Etapa de #{NUMERO}.").strip().splitlines()[-1]
+              filha = url.rsplit("/", 1)[-1]
+              ident = json.loads(gh("api", f"repos/{REPO}/issues/{filha}"))["id"]
+              gh("api", "-X", "POST", f"repos/{REPO}/issues/{NUMERO}/sub_issues",
+                 "-F", f"sub_issue_id={ident}")
+
+              linhas[i] = f"{recuo}- [{marca}] #{filha}"
+              criadas.append(f"#{filha} {texto.strip()}")
+
+          if not criadas:
+              print("::notice::nenhuma etapa nova para desdobrar")
+              sys.exit(0)
+
+          gh("api", "-X", "PATCH", f"repos/{REPO}/issues/{NUMERO}",
+             "-F", "body=@-", entrada="\n".join(linhas))
+          print(f"::notice::{len(criadas)} sub-issue(s) criada(s)")
+          for c in criadas:
+              print(f"  {c}")
+          PY
