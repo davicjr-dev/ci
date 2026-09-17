@@ -123,7 +123,10 @@ jobs:
       - if: steps.py.outputs.tem == 'sim'
         run: |
           python -m pip install --quiet --upgrade pip
-          [ -f requirements.txt ] && pip install --quiet -r requirements.txt
+          # O `|| true` em cada linha importa: o shell da Action roda com -e, e
+          # `[ -f x ] && cmd` devolve 1 quando o arquivo não existe — o que abortaria
+          # o passo em todo repositório que não tem aquele arquivo.
+          [ -f requirements.txt ] && pip install --quiet -r requirements.txt || true
           [ -f pyproject.toml ] && pip install --quiet -e ".[dev]" 2>/dev/null || true
           pip install --quiet ruff pytest
 
