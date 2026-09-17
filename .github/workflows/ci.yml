@@ -1,0 +1,166 @@
+# Checagens que todo repositório da conta herda.
+#
+# Um job só, de propósito: minuto de Actions em repositório privado é arredondado para
+# cima por job, então quatro checagens em quatro jobs custam quatro minutos mesmo levando
+# quinze segundos cada. Em sequência, num job, custam um.
+#
+# O que roda depende da natureza declarada pelo repositório que chama.
+name: ci
+
+on:
+  workflow_call:
+    inputs:
+      natureza:
+        description: "codigo | dados | conteudo | ferramental"
+        required: true
+        type: string
+
+jobs:
+  checar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # histórico completo: é nele que segredo se esconde
+
+      - name: segredo no histórico
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: README que se sustenta
+        run: |
+          falhas=0
+          if [ ! -f README.md ]; then
+            echo "::error::sem README.md"
+            exit 1
+          fi
+          if ! grep -q '<!-- davihub:estado -->' README.md; then
+            echo "::error::README sem os marcadores da seção de estado"
+            falhas=1
+          fi
+          if grep -q '\*(a escrever)\*' README.md; then
+            echo "::warning::README ainda tem trecho marcado como (a escrever)"
+          fi
+          palavras=$(wc -w < README.md)
+          if [ "$palavras" -lt 40 ]; then
+            echo "::error::README com $palavras palavras — ainda é esqueleto"
+            falhas=1
+          fi
+          exit $falhas
+
+      - name: arquivo grande versionado
+        run: |
+          # Arquivo grande versionado costuma ser dado ou build que devia estar ignorado.
+          grandes=$(find . -type f -size +20M -not -path './.git/*' | head -5)
+          if [ -n "$grandes" ]; then
+            echo "::warning::arquivos acima de 20 MB versionados:"
+            echo "$grandes"
+          fi
+
+      # --- conteúdo -------------------------------------------------------------
+      - name: frontmatter válido
+        if: inputs.natureza == 'conteudo'
+        run: |
+          python3 - <<'PY'
+          import pathlib, sys, yaml
+          ruins = []
+          for f in pathlib.Path(".").rglob("*.md"):
+              if ".git" in f.parts:
+                  continue
+              t = f.read_text(errors="ignore")
+              if not t.startswith("---"):
+                  continue
+              fim = t.find("\n---", 3)
+              if fim == -1:
+                  ruins.append(f"{f}: frontmatter sem fechamento")
+                  continue
+              try:
+                  yaml.safe_load(t[3:fim])
+              except yaml.YAMLError as e:
+                  ruins.append(f"{f}: {str(e).splitlines()[0]}")
+          for r in ruins:
+              print(f"::error::{r}")
+          sys.exit(1 if ruins else 0)
+          PY
+
+      - name: link interno apontando para o vazio
+        if: inputs.natureza == 'conteudo'
+        run: |
+          python3 - <<'PY'
+          import pathlib, re, sys
+          padrao = re.compile(r"\[[^\]]*\]\((?!https?://|#|mailto:)([^)]+)\)")
+          quebrados = []
+          for f in pathlib.Path(".").rglob("*.md"):
+              if ".git" in f.parts:
+                  continue
+              for alvo in padrao.findall(f.read_text(errors="ignore")):
+                  alvo = alvo.split("#")[0].strip()
+                  if alvo and not (f.parent / alvo).exists():
+                      quebrados.append(f"{f} -> {alvo}")
+          for q in quebrados:
+              print(f"::error::link quebrado: {q}")
+          sys.exit(1 if quebrados else 0)
+          PY
+
+      # --- código, dados, ferramental -------------------------------------------
+      - id: py
+        if: inputs.natureza != 'conteudo'
+        run: |
+          if [ -f pyproject.toml ] || [ -f requirements.txt ] || [ -f setup.py ] \
+             || [ -n "$(find . -name '*.py' -not -path './.git/*' -print -quit)" ]; then
+            echo "tem=sim" >> "$GITHUB_OUTPUT"
+          else
+            echo "tem=nao" >> "$GITHUB_OUTPUT"
+            echo "::notice::sem Python no repositório, pulando"
+          fi
+
+      - if: steps.py.outputs.tem == 'sim'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - if: steps.py.outputs.tem == 'sim'
+        run: |
+          python -m pip install --quiet --upgrade pip
+          [ -f requirements.txt ] && pip install --quiet -r requirements.txt
+          [ -f pyproject.toml ] && pip install --quiet -e ".[dev]" 2>/dev/null || true
+          pip install --quiet ruff pytest
+
+      - name: lint Python
+        if: steps.py.outputs.tem == 'sim'
+        run: ruff check .
+
+      - name: teste Python
+        if: steps.py.outputs.tem == 'sim'
+        run: |
+          if [ -d tests ] || [ -d test ]; then
+            pytest -q
+          else
+            echo "::warning::repositório com código e sem diretório de testes"
+          fi
+
+      - id: node
+        if: inputs.natureza != 'conteudo'
+        run: |
+          if [ -f package.json ]; then
+            echo "tem=sim" >> "$GITHUB_OUTPUT"
+          else
+            echo "tem=nao" >> "$GITHUB_OUTPUT"
+            echo "::notice::sem package.json, pulando"
+          fi
+
+      - if: steps.node.outputs.tem == 'sim'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - if: steps.node.outputs.tem == 'sim'
+        run: npm ci --silent || npm install --silent
+
+      - name: lint, build e teste Node
+        if: steps.node.outputs.tem == 'sim'
+        run: |
+          npm run --silent lint --if-present
+          npm run --silent build --if-present
+          npm test --if-present
