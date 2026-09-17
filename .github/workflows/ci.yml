@@ -19,12 +19,12 @@ jobs:
   checar:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0   # histórico completo: é nele que segredo se esconde
 
       - name: segredo no histórico
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -116,7 +116,7 @@ jobs:
           fi
 
       - if: steps.py.outputs.tem == 'sim'
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -151,7 +151,7 @@ jobs:
           fi
 
       - if: steps.node.outputs.tem == 'sim'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "22"
 
