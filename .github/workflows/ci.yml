@@ -35,7 +35,7 @@ jobs:
             echo "::error::sem README.md"
             exit 1
           fi
-          if ! grep -q '<!-- davihub:estado -->' README.md; then
+          if ! grep -q '<!-- gerado:estado -->' README.md; then
             echo "::error::README sem os marcadores da seção de estado"
             falhas=1
           fi

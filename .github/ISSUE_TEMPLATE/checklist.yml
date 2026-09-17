@@ -1,0 +1,57 @@
+name: Checklist de feature
+description: O que falta para uma feature acabar
+title: "[checklist] "
+labels: ["checklist"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        O checklist é o registro vivo do que falta. Vale para qualquer natureza de repo,
+        porque toda feature tem um ponto em que acaba — e sem escrever esse ponto antes,
+        não existe terminar, existe cansar.
+
+  - type: input
+    id: o-que-e
+    attributes:
+      label: O que é
+      description: Uma frase concreta, com o domínio real. Não "melhorar o sistema".
+      placeholder: Importar os chamados do GLPI incrementalmente, sem reprocessar o histórico
+    validations:
+      required: true
+
+  - type: input
+    id: pronto-quando
+    attributes:
+      label: Pronto quando
+      description: O critério de aceite desta feature. Uma frase verificável.
+      placeholder: Roda duas vezes seguidas e traz só os chamados novos
+    validations:
+      required: true
+
+  - type: textarea
+    id: por-que-agora
+    attributes:
+      label: Por que agora
+      description: O que estava doendo. Serve para lembrar, meses depois, se valeu.
+
+  - type: textarea
+    id: etapas
+    attributes:
+      label: Etapas
+      description: Uma linha por etapa. Marcar conforme andar.
+      value: |
+        - [ ] 
+        - [ ] 
+        - [ ] 
+
+  - type: checkboxes
+    id: antes-de-fechar
+    attributes:
+      label: Antes de fechar
+      description: Apagar o que não se aplica a esta natureza de repo.
+      options:
+        - label: entregou o "pronto quando" escrito acima
+        - label: CI verde
+        - label: caminho de erro coberto, não só o caminho feliz
+        - label: README reflete o que mudou
+        - label: decisão de arquitetura registrada em `docs/adr/`, se houve alguma

@@ -1,0 +1,34 @@
+name: Decisão a tomar
+description: Uma escolha de arquitetura ou de produto que ainda está aberta
+title: "[decisão] "
+labels: ["decisão"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Serve para a escolha não ficar só na cabeça. Quando decidir, o registro final vai
+        para `docs/adr/` — aqui é onde a dúvida vive enquanto é dúvida.
+
+  - type: input
+    id: escolha
+    attributes:
+      label: O que precisa ser decidido
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternativas
+    attributes:
+      label: Alternativas na mesa
+      description: Uma por linha, com o que cada uma custa.
+      value: |
+        - 
+        - 
+    validations:
+      required: true
+
+  - type: textarea
+    id: travando
+    attributes:
+      label: O que está travando a decisão
+      description: Falta informação? Falta testar algo? Ou é só medo de escolher?
