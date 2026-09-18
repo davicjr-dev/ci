@@ -132,7 +132,24 @@ jobs:
 
       - name: lint Python
         if: steps.py.outputs.tem == 'sim'
-        run: ruff check .
+        run: |
+          # Cobrar o contrato que o repositório declarou, e não o padrão do ruff do dia.
+          #
+          # A partir da 0.16 o ruff ativa por padrão centenas de regras — B, RUF, PLR, S,
+          # DTZ — que antes eram opt-in. Rodar `ruff check .` sem config num repo que não
+          # declarou nenhuma impõe uma opinião que muda a cada versão e que ninguém ali
+          # aceitou. No appdate isso reprovou 192 achados, 161 deles B008: chamada em
+          # argumento padrão, que em FastAPI é o jeito idiomático de injetar dependência.
+          #
+          # Sem contrato declarado, cobra só o que é erro em qualquer estilo: sintaxe e
+          # nome indefinido. Com contrato, cobra o contrato inteiro.
+          if [ -f ruff.toml ] || [ -f .ruff.toml ] \
+             || grep -qs '^\[tool\.ruff' pyproject.toml; then
+            ruff check .
+          else
+            echo "::notice::sem contrato de lint declarado; cobrando só erro de sintaxe e nome indefinido"
+            ruff check --select E9,F63,F7,F82 .
+          fi
 
       - name: teste Python
         if: steps.py.outputs.tem == 'sim'
