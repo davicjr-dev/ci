@@ -22,7 +22,12 @@ jobs:
     uses: davicjr-dev/ci/.github/workflows/ci.yml@main
     with:
       natureza: codigo   # codigo | dados | conteudo | ferramental
+      executor: davi-ci  # opcional; usa o runner efêmero local do repositório
 ```
+
+Sem `executor`, o contrato continua usando `ubuntu-latest`. Como os repositórios
+pertencem a uma conta pessoal, cada repositório privado que informar `davi-ci`
+precisa ter seu próprio runner registrado com esse rótulo.
 
 ## O que roda
 
