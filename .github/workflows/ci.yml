@@ -14,10 +14,15 @@ on:
         description: "codigo | dados | conteudo | ferramental"
         required: true
         type: string
+      executor:
+        description: "rótulo do runner; ubuntu-latest preserva o padrão hospedado"
+        required: false
+        type: string
+        default: ubuntu-latest
 
 jobs:
   checar:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.executor }}
     steps:
       - uses: actions/checkout@v5
         with:
