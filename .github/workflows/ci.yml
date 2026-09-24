@@ -176,12 +176,29 @@ jobs:
           fi
 
       - if: steps.node.outputs.tem == 'sim'
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
           node-version: "22"
+          # Runners hospedados trazem npm/yarn pré-instalados e mascaram esta
+          # dependência. Num runner limpo o cache automático tenta chamar Yarn
+          # antes de o Corepack ser habilitado.
+          package-manager-cache: false
 
-      - if: steps.node.outputs.tem == 'sim'
-        run: npm ci --silent || npm install --silent
+      - name: instalar dependências Node pelo lockfile declarado
+        if: steps.node.outputs.tem == 'sim'
+        run: |
+          if [ -f yarn.lock ]; then
+            corepack enable
+            yarn install --frozen-lockfile
+          elif [ -f pnpm-lock.yaml ]; then
+            corepack enable
+            pnpm install --frozen-lockfile
+          elif [ -f package-lock.json ]; then
+            npm ci --silent
+          else
+            echo "::warning::package.json sem lockfile; instalação não é reproduzível"
+            npm install --silent
+          fi
 
       - name: lint, build e teste Node
         if: steps.node.outputs.tem == 'sim'
